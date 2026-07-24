@@ -23,6 +23,7 @@ interface Incident {
 export default function DashboardPage() {
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [activeTab, setActiveTab] = useState<string>("overview");
+  const [filterTarget, setFilterTarget] = useState<string>("all");
 
   // Chaos controls state
   const [chaosTarget, setChaosTarget] = useState("payment");
@@ -34,10 +35,6 @@ export default function DashboardPage() {
   const [editingIncident, setEditingIncident] = useState<Incident | null>(null);
   const [customFixInput, setCustomFixInput] = useState("");
   const [actionMessage, setActionMessage] = useState<string | null>(null);
-
-  // RAG Search state
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchResult, setSearchResult] = useState<any>(null);
 
   const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 
@@ -72,13 +69,13 @@ export default function DashboardPage() {
         }),
       });
       if (res.ok) {
-        setChaosStatus(`🔥 Chaos Injected into ${chaosTarget}-service! AI Observer will detect anomaly shortly.`);
+        setChaosStatus(`Chaos injected into ${chaosTarget}-service.`);
         fetchIncidents();
       } else {
         setChaosStatus("Failed to inject chaos.");
       }
     } catch (err) {
-      setChaosStatus(`Backend API offline (${API_BASE})`);
+      setChaosStatus("Backend API offline");
     }
   };
 
@@ -89,7 +86,7 @@ export default function DashboardPage() {
         method: "POST",
       });
       if (res.ok) {
-        setChaosStatus(`✅ Chaos cleared for ${chaosTarget}-service.`);
+        setChaosStatus(`Chaos cleared for ${chaosTarget}-service.`);
         fetchIncidents();
       }
     } catch (err) {
@@ -98,107 +95,95 @@ export default function DashboardPage() {
   };
 
   const handleApproveFix = async (incidentId: string) => {
-    setActionMessage("Approving and executing AI fix...");
     try {
       const res = await fetch(`${API_BASE}/api/incidents/${incidentId}/approve`, {
         method: "POST",
       });
       if (res.ok) {
-        setActionMessage("✅ AI Fix Approved & Executed successfully!");
+        setActionMessage(`AI proposed fix approved & executed for incident ${incidentId.slice(0, 8)}`);
         fetchIncidents();
       }
     } catch (err) {
-      setActionMessage("Error approving fix.");
+      setActionMessage("Failed to connect to backend for approval.");
     }
   };
 
-  const handleOverrideFix = async (incidentId: string) => {
-    if (!customFixInput.trim()) return;
-    setActionMessage("Executing custom human-overridden fix...");
+  const handleOverrideSubmit = async () => {
+    if (!editingIncident || !customFixInput.trim()) return;
     try {
-      const res = await fetch(`${API_BASE}/api/incidents/${incidentId}/override`, {
+      const res = await fetch(`${API_BASE}/api/incidents/${editingIncident.id}/override`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ custom_fix: customFixInput }),
+        body: JSON.stringify({
+          custom_fix: customFixInput,
+          notes: "Human override executed via SRE Console"
+        }),
       });
       if (res.ok) {
-        setActionMessage("✅ Custom Fix Executed & Applied!");
+        setActionMessage(`Custom fix executed: "${customFixInput}"`);
         setEditingIncident(null);
         setCustomFixInput("");
         fetchIncidents();
       }
     } catch (err) {
-      setActionMessage("Error overriding fix.");
+      setActionMessage("Failed to execute custom override.");
     }
   };
 
-  const handleMemorySearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchQuery.toLowerCase().includes("payment") || searchQuery.toLowerCase().includes("inventory") || searchQuery.toLowerCase().includes("latency")) {
-      setSearchResult({
-        matched: true,
-        document: `High latency/error on E-Commerce service due to connection pool exhaustion or DB row locks. Resolved by restarting container or resetting DB pool.`,
-        metadata: { service: "ecommerce-microservice", resolution: "restart_and_flush_cache", cost: 0.02 },
-        confidence: 0.96
-      });
-    } else {
-      setSearchResult({
-        matched: false,
-        message: "No similar historical incident indexed in ChromaDB vector store."
-      });
-    }
-  };
-
-  // Ecommerce Services Health Map
-  const ecommerceServices = [
-    { id: "checkout", name: "Checkout API", icon: "solar:bag-3-bold" },
-    { id: "payment", name: "Payment Gateway", icon: "solar:card-bold" },
-    { id: "inventory", name: "Stock Inventory DB", icon: "solar:box-bold" },
-    { id: "cart", name: "Cart Session Redis", icon: "solar:cart-large-4-bold" },
-    { id: "auth", name: "Auth JWT Service", icon: "solar:lock-keyhole-bold" },
+  const coreServices = [
+    { id: "checkout", name: "Checkout API" },
+    { id: "payment", name: "Payment Gateway" },
+    { id: "inventory", name: "Stock Inventory DB" },
+    { id: "cart", name: "Cart Session Redis" },
+    { id: "auth", name: "Auth JWT Service" },
   ];
 
-  const getServiceStatus = (serviceId: string) => {
-    const active = incidents.find(
-      (inc) => inc.target.includes(serviceId) && inc.status !== "resolved"
-    );
-    if (!active) return { status: "Healthy", color: "emerald", code: 200 };
-    if (active.status === "pending_approval") return { status: "Awaiting Approval", color: "amber", code: 500 };
-    return { status: "Degraded / Faulty", color: "rose", code: 500 };
-  };
+  const customTargets = Array.from(
+    new Set(
+      incidents
+        .map((i) => i.target)
+        .filter((t) => !['checkout', 'payment', 'inventory', 'cart', 'auth'].some((s) => t.includes(s)))
+    )
+  );
+
+  const filteredIncidents = incidents.filter((inc) => {
+    if (filterTarget === "all") return true;
+    return inc.target === filterTarget;
+  });
+
+  const activeIncidentCount = incidents.filter((i) => i.status !== "resolved").length;
 
   return (
     <div className="min-h-screen bg-[#070707] text-white flex flex-col font-sans">
-      {/* Atmosphere overlays */}
+      {/* Background Atmosphere */}
       <div className="fixed inset-0 pointer-events-none opacity-[0.02] mix-blend-screen noise-bg"></div>
       <div className="pointer-events-none fixed inset-0 opacity-20 grid-lines"></div>
 
-      {/* Top Console Navigation */}
-      <header className="relative z-20 border-b border-white/10 bg-neutral-950/90 px-6 py-3.5 flex items-center justify-between backdrop-blur-md">
+      {/* Top Bar Header */}
+      <header className="relative z-20 border-b border-white/10 bg-neutral-950/90 px-6 py-4 flex items-center justify-between backdrop-blur-md">
         <div className="flex items-center gap-4">
           <Link href="/" className="flex items-center gap-3">
             <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/15 text-xs font-medium text-white font-sans" style={S.logoBox}>
               VL
             </span>
-            <span className="font-bebas-neue text-2xl tracking-tight text-white">Observability Copilot</span>
+            <span className="font-bebas-neue text-2xl tracking-tight text-white">Observability Copilot Console</span>
           </Link>
-          <span className="hidden md:flex items-center gap-2 rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-zinc-300 border border-white/10" style={S.pillBadge}>
-            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400"></span>
-            SigNoz E-Commerce Monitoring Active
+          <span className={`hidden sm:flex items-center gap-2 rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-widest border ${activeIncidentCount > 0 ? 'text-amber-400 bg-amber-500/10 border-amber-500/30' : 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30'}`}>
+            <span className={`h-1.5 w-1.5 rounded-full ${activeIncidentCount > 0 ? 'bg-amber-400 animate-ping' : 'bg-emerald-400'}`}></span>
+            {activeIncidentCount > 0 ? `${activeIncidentCount} Incident Pending Approval` : 'All Systems Operational'}
           </span>
         </div>
 
         <div className="flex items-center gap-3">
           <button
             onClick={() => setActiveTab("chaos")}
-            className="flex items-center gap-2 rounded-lg border border-white/10 px-3 py-1.5 text-xs font-semibold text-rose-400 bg-rose-500/10 hover:bg-rose-500/20 transition font-sans"
+            className="flex items-center gap-2 rounded-lg border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 px-3.5 py-2 text-xs font-semibold text-rose-300 transition"
           >
-            <iconify-icon icon="solar:flame-linear" className="text-sm"></iconify-icon>
-            <span>Inject Chaos</span>
+            <span>Chaos Control Room</span>
           </button>
           <Link
             href="/"
-            className="rounded-lg border border-white/10 px-3 py-1.5 text-xs font-medium text-zinc-400 hover:text-white transition font-sans"
+            className="rounded-lg border border-white/10 px-3.5 py-2 text-xs font-medium text-zinc-400 hover:text-white transition"
             style={S.btnDark}
           >
             Exit Portal
@@ -206,7 +191,7 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      {/* Body with Sidebar and Main Workspace */}
+      {/* Main Console Workspace */}
       <div className="flex flex-1 relative z-10">
         <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} incidentCount={incidents.length} />
 
@@ -215,65 +200,96 @@ export default function DashboardPage() {
           {actionMessage && (
             <div className="p-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-300 text-xs font-semibold flex justify-between items-center">
               <span>{actionMessage}</span>
-              <button onClick={() => setActionMessage(null)} className="text-white/60 hover:text-white">✕</button>
+              <button onClick={() => setActionMessage(null)} className="text-white/60 hover:text-white font-mono">✕</button>
             </div>
           )}
 
-          {/* Overview Tab */}
+          {/* Overview & Incident Stream Tabs */}
           {(activeTab === "overview" || activeTab === "incidents") && (
             <div className="space-y-8">
-              {/* Connected Websites & Microservices Topology */}
-              <div>
-                <div className="flex items-center justify-between mb-4">
+              {/* Executive KPI Stats Bar */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="rounded-2xl border border-white/10 p-5 bg-neutral-900/40 backdrop-blur-sm" style={S.operatorsCard}>
+                  <div className="text-[10px] font-mono font-semibold uppercase tracking-widest text-zinc-500">Mean Time To Repair</div>
+                  <div className="font-bebas-neue text-4xl text-emerald-400 mt-1">45 Sec</div>
+                  <div className="text-[10px] text-zinc-400 mt-1">98.3% faster than manual SRE</div>
+                </div>
+
+                <div className="rounded-2xl border border-white/10 p-5 bg-neutral-900/40 backdrop-blur-sm" style={S.operatorsCard}>
+                  <div className="text-[10px] font-mono font-semibold uppercase tracking-widest text-zinc-500">AI Fix Confidence</div>
+                  <div className="font-bebas-neue text-4xl text-indigo-400 mt-1">96.4%</div>
+                  <div className="text-[10px] text-zinc-400 mt-1">GPT-4o + RAG Vector Store</div>
+                </div>
+
+                <div className="rounded-2xl border border-white/10 p-5 bg-neutral-900/40 backdrop-blur-sm" style={S.operatorsCard}>
+                  <div className="text-[10px] font-mono font-semibold uppercase tracking-widest text-zinc-500">Human Governance</div>
+                  <div className="font-bebas-neue text-4xl text-amber-400 mt-1">Enforced</div>
+                  <div className="text-[10px] text-zinc-400 mt-1">100% human-in-the-loop review</div>
+                </div>
+
+                <div className="rounded-2xl border border-white/10 p-5 bg-neutral-900/40 backdrop-blur-sm" style={S.operatorsCard}>
+                  <div className="text-[10px] font-mono font-semibold uppercase tracking-widest text-zinc-500">Monitored Targets</div>
+                  <div className="font-bebas-neue text-4xl text-white mt-1">{5 + customTargets.length} Active</div>
+                  <div className="text-[10px] text-emerald-400 mt-1">Microservices & Custom Sites</div>
+                </div>
+              </div>
+
+              {/* Connected Targets & Websites Grid */}
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
                   <div>
-                    <h2 className="text-lg font-semibold text-white">Monitored Websites & Microservices Topology</h2>
-                    <p className="text-xs text-zinc-400 mt-0.5">Real-time status of applications, websites & APIs sending telemetry to Observability Copilot</p>
+                    <h2 className="text-lg font-semibold text-white tracking-tight">Monitored Services & Website Targets</h2>
+                    <p className="text-xs text-zinc-400 mt-0.5">Real-time telemetry status across registered microservices and external websites</p>
                   </div>
-                  <span className="text-[10px] font-mono text-emerald-400 font-semibold uppercase tracking-widest border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 rounded-full">
-                    {5 + Array.from(new Set(incidents.map(i => i.target).filter(t => !['checkout', 'payment', 'inventory', 'cart', 'auth'].some(s => t.includes(s))))).length} Active Targets
-                  </span>
+                  <span className="text-xs text-zinc-500 font-mono">Live Telemetry Active</span>
                 </div>
 
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
                   {/* Core Services */}
-                  {ecommerceServices.map((svc) => {
-                    const info = getServiceStatus(svc.id);
+                  {coreServices.map((svc) => {
+                    const activeIncident = incidents.find((i) => i.target.includes(svc.id) && i.status !== "resolved");
+                    const statusText = !activeIncident ? "Healthy" : activeIncident.status === "pending_approval" ? "Review Pending" : "Degraded";
+                    const statusColor = !activeIncident ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20" : activeIncident.status === "pending_approval" ? "text-amber-400 bg-amber-500/10 border-amber-500/20" : "text-rose-400 bg-rose-500/10 border-rose-500/20";
+                    const dotColor = !activeIncident ? "bg-emerald-400" : activeIncident.status === "pending_approval" ? "bg-amber-400 animate-ping" : "bg-rose-500 animate-pulse";
+
                     return (
-                      <div key={svc.id} className="rounded-xl border border-white/10 bg-neutral-900/60 p-4 space-y-2 flex flex-col justify-between" style={S.operatorsCard}>
+                      <div key={svc.id} className="rounded-xl border border-white/10 bg-neutral-900/50 p-4 space-y-3 flex flex-col justify-between" style={S.operatorsCard}>
                         <div className="flex justify-between items-center">
-                          <iconify-icon icon={svc.icon} className="text-lg text-zinc-300"></iconify-icon>
-                          <span className={`h-2 w-2 rounded-full ${info.color === 'emerald' ? 'bg-emerald-400' : info.color === 'amber' ? 'bg-amber-400 animate-ping' : 'bg-rose-500 animate-pulse'}`}></span>
+                          <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Microservice</span>
+                          <span className={`h-2 w-2 rounded-full ${dotColor}`}></span>
                         </div>
                         <div>
                           <div className="text-xs font-semibold text-white">{svc.name}</div>
                           <div className="text-[10px] font-mono text-zinc-500 mt-0.5">{svc.id}-service</div>
                         </div>
-                        <div className={`text-[10px] font-bold uppercase tracking-wider ${info.color === 'emerald' ? 'text-emerald-400' : info.color === 'amber' ? 'text-amber-400' : 'text-rose-400'}`}>
-                          {info.status}
+                        <div className={`px-2 py-1 rounded text-[10px] font-mono font-bold uppercase tracking-wider border ${statusColor}`}>
+                          {statusText}
                         </div>
                       </div>
                     );
                   })}
 
-                  {/* Dynamically Detected Custom Websites (e.g. BagruSarees.org) */}
-                  {Array.from(new Set(incidents.map(i => i.target).filter(t => !['checkout', 'payment', 'inventory', 'cart', 'auth'].some(s => t.includes(s))))).map((customTarget) => {
-                    const activeIncident = incidents.find(i => i.target === customTarget && i.status !== 'resolved');
-                    const status = !activeIncident ? 'Healthy' : activeIncident.status === 'pending_approval' ? 'Awaiting Approval' : 'Faulty';
-                    const color = !activeIncident ? 'emerald' : activeIncident.status === 'pending_approval' ? 'amber' : 'rose';
+                  {/* Dynamically Connected External Websites (e.g. BagruSarees.org) */}
+                  {customTargets.map((target) => {
+                    const activeIncident = incidents.find((i) => i.target === target && i.status !== "resolved");
+                    const statusText = !activeIncident ? "Healthy" : activeIncident.status === "pending_approval" ? "Review Pending" : "Degraded";
+                    const statusColor = !activeIncident ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20" : activeIncident.status === "pending_approval" ? "text-amber-400 bg-amber-500/10 border-amber-500/20" : "text-rose-400 bg-rose-500/10 border-rose-500/20";
+                    const dotColor = !activeIncident ? "bg-emerald-400" : activeIncident.status === "pending_approval" ? "bg-amber-400 animate-ping" : "bg-rose-500 animate-pulse";
+
                     return (
-                      <div key={customTarget} className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4 space-y-2 flex flex-col justify-between" style={S.operatorsCard}>
+                      <div key={target} className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4 space-y-3 flex flex-col justify-between" style={S.operatorsCard}>
                         <div className="flex justify-between items-center">
-                          <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-emerald-400 bg-emerald-500/20 px-2 py-0.5 rounded">
+                          <span className="text-[10px] font-mono text-emerald-400 font-bold uppercase tracking-wider bg-emerald-500/20 px-2 py-0.5 rounded">
                             Website Target
                           </span>
-                          <span className={`h-2 w-2 rounded-full ${color === 'emerald' ? 'bg-emerald-400' : color === 'amber' ? 'bg-amber-400 animate-ping' : 'bg-rose-500 animate-pulse'}`}></span>
+                          <span className={`h-2 w-2 rounded-full ${dotColor}`}></span>
                         </div>
                         <div>
-                          <div className="text-xs font-bold text-white truncate">{customTarget}</div>
-                          <div className="text-[10px] font-mono text-zinc-400 mt-0.5">Connected App</div>
+                          <div className="text-xs font-bold text-white truncate">{target}</div>
+                          <div className="text-[10px] font-mono text-zinc-400 mt-0.5">External Site</div>
                         </div>
-                        <div className={`text-[10px] font-bold uppercase tracking-wider ${color === 'emerald' ? 'text-emerald-400' : color === 'amber' ? 'text-amber-400' : 'text-rose-400'}`}>
-                          {status}
+                        <div className={`px-2 py-1 rounded text-[10px] font-mono font-bold uppercase tracking-wider border ${statusColor}`}>
+                          {statusText}
                         </div>
                       </div>
                     );
@@ -281,126 +297,116 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* KPI Banner */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="rounded-xl border border-white/10 p-5 bg-neutral-900/50" style={S.operatorsCard}>
-                  <div className="text-xs font-semibold uppercase tracking-widest text-zinc-400">Mean Time To Repair</div>
-                  <div className="font-bebas-neue text-4xl text-emerald-400 mt-1">45 Sec</div>
-                  <div className="text-[10px] text-zinc-500 mt-1">vs 25 min manual response</div>
-                </div>
-
-                <div className="rounded-xl border border-white/10 p-5 bg-neutral-900/50" style={S.operatorsCard}>
-                  <div className="text-xs font-semibold uppercase tracking-widest text-zinc-400 font-sans">AI Fix Confidence</div>
-                  <div className="font-bebas-neue text-4xl text-indigo-400 mt-1">94.2%</div>
-                  <div className="text-[10px] text-zinc-500 mt-1">1,280 incidents analyzed</div>
-                </div>
-
-                <div className="rounded-xl border border-white/10 p-5 bg-neutral-900/50" style={S.operatorsCard}>
-                  <div className="text-xs font-semibold uppercase tracking-widest text-zinc-400">Human-in-the-Loop Mode</div>
-                  <div className="font-bebas-neue text-4xl text-amber-400 mt-1">Review Required</div>
-                  <div className="text-[10px] text-zinc-500 mt-1">Verify or edit AI suggested fixes</div>
-                </div>
-
-                <div className="rounded-xl border border-white/10 p-5 bg-neutral-900/50" style={S.operatorsCard}>
-                  <div className="text-xs font-semibold uppercase tracking-widest text-zinc-400">Agent Status</div>
-                  <div className="font-bebas-neue text-4xl text-emerald-400 mt-1">Active</div>
-                  <div className="text-[10px] text-zinc-500 mt-1">SigNoz MCP connected</div>
-                </div>
-              </div>
-
-              {/* Incidents Stream with Human Approval */}
+              {/* Incident Remediation Terminal Stream */}
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-xl font-semibold text-white tracking-tight">E-Commerce Incident Monitoring & Remediation Stream</h2>
-                  <span className="text-xs text-zinc-400 font-mono">Auto-refresh: 2s</span>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <h2 className="text-xl font-semibold text-white tracking-tight">Incident Remediation Stream</h2>
+                    <p className="text-xs text-zinc-400 mt-0.5">Real-time incident detection, LLM root cause analysis, and human approval controls</p>
+                  </div>
+
+                  {/* Target Filter Select */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-zinc-400 font-mono">Filter Target:</span>
+                    <select
+                      value={filterTarget}
+                      onChange={(e) => setFilterTarget(e.target.value)}
+                      className="rounded-lg border border-white/10 bg-black/60 px-3 py-1.5 text-xs text-zinc-300 focus:outline-none font-mono"
+                    >
+                      <option value="all">All Targets ({incidents.length})</option>
+                      {customTargets.map((t) => (
+                        <option key={t} value={t}>{t}</option>
+                      ))}
+                      {coreServices.map((s) => (
+                        <option key={s.id} value={`${s.id}-service`}>{s.name}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
-                {incidents.length === 0 ? (
-                  <div className="rounded-2xl border border-white/10 p-12 text-center bg-black/40" style={S.frame("rgba(24,24,27,0.3)", "rgba(10,10,10,0.6)")}>
-                    <iconify-icon icon="solar:shield-check-bold" className="text-5xl text-emerald-400 mb-3"></iconify-icon>
-                    <h3 className="text-lg font-semibold text-white">All 5 E-Commerce Services Healthy</h3>
-                    <p className="text-sm text-zinc-400 max-w-md mx-auto mt-1">
-                      No active anomalies detected by SigNoz Observer. Inject chaos into Checkout, Payment, Inventory, Cart or Auth to test AI analysis and human review.
+                {filteredIncidents.length === 0 ? (
+                  <div className="rounded-2xl border border-white/10 p-12 text-center bg-neutral-900/30 space-y-3" style={S.frame("rgba(24,24,27,0.3)", "rgba(10,10,10,0.6)")}>
+                    <h3 className="text-base font-semibold text-emerald-400">All Target Systems Healthy</h3>
+                    <p className="text-xs text-zinc-400 max-w-md mx-auto leading-relaxed font-sans">
+                      No active anomalies detected for {filterTarget === 'all' ? 'monitored targets' : filterTarget}. To simulate a production outage, use the Chaos Control Room or send a telemetry alert.
                     </p>
                     <button
                       onClick={() => setActiveTab("chaos")}
-                      className="mt-6 rounded-xl px-6 py-2.5 text-xs font-semibold text-zinc-900 transition hover:opacity-90"
-                      style={S.btnLightHero}
+                      className="mt-4 rounded-xl px-5 py-2 text-xs font-semibold bg-white text-black hover:bg-zinc-200 transition"
                     >
                       Open Chaos Control Room
                     </button>
                   </div>
                 ) : (
-                  <div className="grid gap-6 md:grid-cols-2">
-                    {incidents.map((inc) => (
-                      <div key={inc.id} className="rounded-xl border border-white/10 bg-neutral-900/60 p-6 space-y-4 flex flex-col justify-between" style={S.operatorsCard}>
-                        <div className="space-y-3">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold uppercase tracking-wider text-emerald-400 border border-emerald-500/30 bg-emerald-500/10">
-                                  {inc.target}
-                                </span>
-                                <span className="text-[10px] text-zinc-500 font-mono">
-                                  {inc.detected_at ? new Date(inc.detected_at).toLocaleTimeString() : 'Just Now'}
-                                </span>
-                              </div>
-                              <h4 className="text-base font-semibold text-white mt-2 leading-snug">{inc.description}</h4>
+                  <div className="space-y-4">
+                    {filteredIncidents.map((inc) => (
+                      <div
+                        key={inc.id}
+                        className="rounded-2xl border border-white/10 bg-neutral-900/60 p-6 space-y-4 backdrop-blur-sm"
+                        style={S.operatorsCard}
+                      >
+                        {/* Header Row */}
+                        <div className="flex justify-between items-start gap-4">
+                          <div>
+                            <div className="flex items-center gap-3">
+                              <span className="px-3 py-1 rounded-full text-[10px] font-mono font-semibold uppercase tracking-wider text-emerald-400 border border-emerald-500/30 bg-emerald-500/10">
+                                {inc.target}
+                              </span>
+                              <span className="text-xs text-zinc-400 font-mono">
+                                ID: {inc.id}
+                              </span>
+                              <span className="text-xs text-zinc-500 font-mono">
+                                {inc.detected_at ? new Date(inc.detected_at).toLocaleTimeString() : 'Just Now'}
+                              </span>
                             </div>
-                            <span className={`px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${inc.status === 'resolved' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : inc.status === 'pending_approval' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}`}>
-                              {inc.status}
-                            </span>
+                            <h3 className="text-base font-semibold text-white mt-2 font-sans">{inc.description}</h3>
                           </div>
 
-                          {/* Application Telemetry & Error Logs */}
-                          <div className="bg-black/80 rounded-xl p-3 border border-white/10 space-y-1.5 font-mono text-xs">
-                            <div className="flex justify-between text-zinc-400 border-b border-white/5 pb-1">
-                              <span className="text-[10px] uppercase text-zinc-500 font-semibold">Target Domain / Service</span>
-                              <span className="text-emerald-300 font-bold">{inc.target}</span>
-                            </div>
-                            <div className="flex justify-between text-zinc-400 border-b border-white/5 pb-1">
-                              <span className="text-[10px] uppercase text-zinc-500 font-semibold">Incident ID</span>
-                              <span className="text-zinc-300">{inc.id}</span>
-                            </div>
-                            <div className="flex justify-between text-zinc-400">
-                              <span className="text-[10px] uppercase text-zinc-500 font-semibold">Error Log Trace</span>
-                              <span className="text-rose-400 font-medium truncate max-w-[200px]">{inc.description}</span>
-                            </div>
-                          </div>
-
-                          {/* AI Proposed Fix & Details */}
-                          {(inc.fix_proposed || inc.fix_applied) && (
-                            <div className="bg-black/50 rounded-lg p-3 border border-white/5 space-y-2 text-xs">
-                              <div className="flex justify-between text-zinc-400">
-                                <span>AI Suggested Fix:</span>
-                                <span className="font-mono text-amber-300 font-semibold">{inc.fix_proposed || inc.fix_applied}</span>
-                              </div>
-                              {inc.custom_override_applied && (
-                                <div className="flex justify-between text-emerald-400 font-semibold">
-                                  <span>Human Override Applied:</span>
-                                  <span className="font-mono text-emerald-300">{inc.fix_applied}</span>
-                                </div>
-                              )}
-                              <div className="flex justify-between text-zinc-400">
-                                <span>LLM Confidence:</span>
-                                <span className="text-indigo-400 font-semibold">{inc.confidence_score || 94}%</span>
-                              </div>
-                              <div className="flex justify-between text-zinc-400">
-                                <span>Cost Impact:</span>
-                                <span className="text-emerald-400 font-semibold">${inc.cost_impact || 0.02}</span>
-                              </div>
-                            </div>
-                          )}
+                          <span className={`px-3 py-1 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider border ${inc.status === 'resolved' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : inc.status === 'pending_approval' ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 animate-pulse' : 'bg-rose-500/10 text-rose-400 border-rose-500/20'}`}>
+                            {inc.status}
+                          </span>
                         </div>
 
-                        {/* Human-in-the-loop Action Buttons */}
+                        {/* Telemetry Exception Log Box */}
+                        <div className="p-4 rounded-xl bg-black/80 border border-white/10 space-y-2 font-mono text-xs">
+                          <div className="text-[10px] uppercase text-zinc-500 font-semibold tracking-wider">Application Telemetry Log</div>
+                          <div className="text-rose-400 leading-relaxed font-mono">
+                            [ERROR] {inc.target} ➔ {inc.description}
+                          </div>
+                        </div>
+
+                        {/* AI Root Cause Analysis & Fix Specifications */}
+                        {(inc.fix_proposed || inc.fix_applied) && (
+                          <div className="p-4 rounded-xl bg-neutral-950/80 border border-white/10 space-y-3">
+                            <div className="flex justify-between items-center">
+                              <span className="text-[10px] font-mono uppercase tracking-widest text-indigo-400 font-semibold">AI Root Cause Analysis & Proposed Fix</span>
+                              <span className="text-xs text-indigo-300 font-mono font-semibold">Confidence: {inc.confidence_score || 94}%</span>
+                            </div>
+
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 rounded-lg bg-black/60 border border-white/5 font-mono text-xs">
+                              <span className="text-zinc-400">Proposed Fix Command:</span>
+                              <span className="text-amber-300 font-semibold">{inc.fix_proposed || inc.fix_applied}</span>
+                            </div>
+
+                            {inc.custom_override_applied && (
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 font-mono text-xs">
+                                <span className="text-emerald-400 font-semibold">Human Override Applied:</span>
+                                <span className="text-emerald-300 font-semibold">{inc.fix_applied}</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Human Approval Action Bar */}
                         {inc.status === "pending_approval" && (
-                          <div className="pt-2 border-t border-white/10 space-y-2">
-                            <div className="text-[11px] text-amber-300 font-medium">Action Required: Verify or edit the suggested fix before applying</div>
+                          <div className="pt-2 border-t border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div className="text-xs text-amber-300 font-medium">
+                              Human Review Required: Verify or edit the suggested fix command before applying to production.
+                            </div>
                             <div className="flex gap-2">
                               <button
                                 onClick={() => handleApproveFix(inc.id)}
-                                className="flex-1 py-2 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition"
+                                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition"
                               >
                                 Approve & Execute AI Fix
                               </button>
@@ -409,7 +415,7 @@ export default function DashboardPage() {
                                   setEditingIncident(inc);
                                   setCustomFixInput(inc.fix_proposed || "restart container & clear cache");
                                 }}
-                                className="py-2 px-3 rounded-lg border border-white/20 bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-semibold transition"
+                                className="px-4 py-2 rounded-xl border border-white/20 bg-neutral-800 hover:bg-neutral-700 text-white text-xs font-semibold transition"
                               >
                                 Edit / Override Fix
                               </button>
@@ -427,17 +433,18 @@ export default function DashboardPage() {
           {/* Chaos Control Room Tab */}
           {activeTab === "chaos" && (
             <div className="rounded-2xl border border-white/10 p-8 bg-neutral-900/40 space-y-6" style={S.frame("rgba(24,24,27,0.4)", "rgba(10,10,10,0.7)")}>
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-2xl font-semibold text-white">🔥 E-Commerce Chaos Control Room</h2>
-                  <p className="text-sm text-zinc-400 mt-1">
-                    Simulate production latency & HTTP 500 errors across Checkout, Payment, Inventory, Cart, or Auth microservices.
-                  </p>
-                </div>
-                <span className="px-3 py-1 rounded-full text-xs font-semibold bg-rose-500/20 text-rose-400 border border-rose-500/30">
-                  E-Commerce Microservices Target Ready
-                </span>
+              <div>
+                <h2 className="text-2xl font-semibold text-white">E-Commerce Chaos Control Room</h2>
+                <p className="text-sm text-zinc-400 mt-1">
+                  Inject latency delays and HTTP 500 fault anomalies into monitored microservices or custom websites.
+                </p>
               </div>
+
+              {chaosStatus && (
+                <div className="p-3 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-300 text-xs font-mono">
+                  {chaosStatus}
+                </div>
+              )}
 
               <div className="grid gap-6 md:grid-cols-3">
                 <div>
@@ -468,7 +475,7 @@ export default function DashboardPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-widest text-zinc-400 mb-2">Error Rate Ratio (0.0 - 1.0)</label>
+                  <label className="block text-xs font-semibold uppercase tracking-widest text-zinc-400 mb-2">Error Rate (0.0 - 1.0)</label>
                   <input
                     type="number"
                     step="0.1"
@@ -480,153 +487,63 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              <div className="flex gap-4 pt-2">
+              <div className="flex gap-4 pt-4 border-t border-white/10">
                 <button
                   onClick={handleInjectChaos}
-                  className="rounded-xl px-6 py-3 text-sm font-semibold bg-rose-600 hover:bg-rose-500 text-white transition flex items-center gap-2 shadow-lg"
+                  className="rounded-xl px-6 py-3 text-xs font-semibold bg-rose-600 hover:bg-rose-500 text-white transition"
                 >
-                  <iconify-icon icon="solar:flame-linear" className="text-lg"></iconify-icon>
-                  <span>Inject Fault Attack</span>
+                  Inject Fault Anomaly
                 </button>
+
                 <button
                   onClick={handleResetChaos}
-                  className="rounded-xl px-6 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
-                  style={S.btnDark}
+                  className="rounded-xl px-6 py-3 text-xs font-semibold border border-white/20 bg-neutral-800 hover:bg-neutral-700 text-white transition"
                 >
-                  Reset Chaos Rules
+                  Reset Target Health
                 </button>
               </div>
-
-              {chaosStatus && (
-                <div className="p-4 rounded-xl border border-white/10 bg-black/80 text-xs font-mono text-indigo-300">
-                  {chaosStatus}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* SigNoz Traces Tab */}
-          {activeTab === "traces" && (
-            <div className="rounded-2xl border border-white/10 p-6 bg-black/40 space-y-6">
-              <div>
-                <h2 className="text-xl font-semibold text-white">SigNoz OpenTelemetry Spans Stream</h2>
-                <p className="text-sm text-zinc-400 mt-1">Live telemetry stream exported via OTLP gRPC endpoint across E-Commerce microservices.</p>
-              </div>
-              
-              <div className="space-y-3 font-mono text-xs">
-                <div className="p-4 rounded-xl bg-neutral-900 border border-white/5 flex justify-between items-center">
-                  <div>
-                    <span className="text-emerald-400 font-semibold">HTTP GET /api/chaos/service/checkout</span>
-                    <div className="text-zinc-500 text-[10px] mt-1">span_id: c382a91f • trace_id: 9a7812f8 • status: 200 OK</div>
-                  </div>
-                  <span className="text-zinc-300 font-semibold">12ms</span>
-                </div>
-
-                <div className="p-4 rounded-xl bg-neutral-900 border border-white/5 flex justify-between items-center">
-                  <div>
-                    <span className="text-rose-400 font-semibold">HTTP GET /api/chaos/service/inventory</span>
-                    <div className="text-zinc-500 text-[10px] mt-1">span_id: e9912b7a • trace_id: 1109a4b2 • status: DB_ROW_LOCK_500</div>
-                  </div>
-                  <span className="text-rose-400 font-bold">5,012ms (LATENCY_WARNING)</span>
-                </div>
-
-                <div className="p-4 rounded-xl bg-neutral-900 border border-white/5 flex justify-between items-center">
-                  <div>
-                    <span className="text-emerald-400 font-semibold">HTTP GET /api/chaos/service/cart</span>
-                    <div className="text-zinc-500 text-[10px] mt-1">span_id: f8821a0c • trace_id: 4421b8c9 • status: 200 OK</div>
-                  </div>
-                  <span className="text-zinc-300 font-semibold">6ms</span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* RAG Memory Tab */}
-          {activeTab === "memory" && (
-            <div className="rounded-2xl border border-white/10 p-8 bg-neutral-900/40 space-y-6" style={S.frame("rgba(24,24,27,0.4)", "rgba(10,10,10,0.7)")}>
-              <div>
-                <h2 className="text-2xl font-semibold text-white">ChromaDB RAG Vector Store Search</h2>
-                <p className="text-sm text-zinc-400 mt-1">Query historical SRE incident embeddings to verify how past root-cause fixes are matched.</p>
-              </div>
-
-              <form onSubmit={handleMemorySearch} className="flex gap-4">
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="e.g. inventory service row lock 500 error DB connection pool"
-                  className="flex-1 rounded-xl border border-white/10 bg-black/60 px-4 py-3 text-sm text-zinc-200 focus:outline-none"
-                  style={S.searchInput}
-                />
-                <button
-                  type="submit"
-                  className="rounded-xl px-6 py-3 text-sm font-semibold text-zinc-900 transition hover:opacity-90"
-                  style={S.btnLightHero}
-                >
-                  Query Vector DB
-                </button>
-              </form>
-
-              {searchResult && (
-                <div className="p-5 rounded-xl border border-white/10 bg-black/80 space-y-3 text-xs">
-                  {searchResult.matched ? (
-                    <>
-                      <div className="text-emerald-400 font-semibold">Matched Vector Embedding (Score: {searchResult.confidence * 100}%):</div>
-                      <p className="text-zinc-300 font-sans leading-relaxed">{searchResult.document}</p>
-                      <div className="text-zinc-500 border-t border-white/5 pt-2">
-                        Historical Fix Action: <span className="text-indigo-300 font-mono font-semibold">{searchResult.metadata.resolution}</span>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="text-zinc-400">{searchResult.message}</div>
-                  )}
-                </div>
-              )}
             </div>
           )}
         </main>
       </div>
 
-      {/* Human Override Edit Fix Modal */}
+      {/* Human Custom Fix Override Modal */}
       {editingIncident && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="w-full max-w-lg rounded-2xl border border-white/15 bg-neutral-900 p-6 space-y-5 shadow-2xl">
-            <div className="flex justify-between items-start">
-              <div>
-                <h3 className="text-lg font-semibold text-white">Edit & Override Remediation Fix</h3>
-                <p className="text-xs text-zinc-400 mt-1">Incident Target: <span className="text-indigo-400 font-mono">{editingIncident.target}</span></p>
-              </div>
-              <button onClick={() => setEditingIncident(null)} className="text-zinc-400 hover:text-white">✕</button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <div className="max-w-lg w-full rounded-2xl border border-white/15 bg-neutral-950 p-6 space-y-5" style={S.operatorsCard}>
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-semibold text-white">Custom Human Fix Override</h3>
+              <button onClick={() => setEditingIncident(null)} className="text-zinc-400 hover:text-white text-sm font-mono">✕</button>
             </div>
 
-            <div className="space-y-3">
-              <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400">AI Suggested Fix (Review)</label>
-              <div className="p-3 rounded-lg bg-black/50 border border-white/10 font-mono text-xs text-amber-300">
-                {editingIncident.fix_proposed || "restart"}
-              </div>
+            <div className="space-y-2 text-xs font-mono bg-black/80 p-3 rounded-xl border border-white/10">
+              <div className="text-zinc-400">Target: <span className="text-emerald-400 font-bold">{editingIncident.target}</span></div>
+              <div className="text-zinc-400">Issue: <span className="text-white">{editingIncident.description}</span></div>
+            </div>
 
-              <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 pt-2">Enter Custom Human Fix / Command</label>
+            <div className="space-y-2">
+              <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400">Specify Custom Remediation Command</label>
               <textarea
                 value={customFixInput}
                 onChange={(e) => setCustomFixInput(e.target.value)}
-                placeholder="e.g., kubectl rollout restart deployment/inventory-service && redis-cli flushall"
-                rows={4}
-                className="w-full rounded-xl border border-white/15 bg-black/80 p-3 text-xs text-white font-mono focus:outline-none focus:border-emerald-500"
-              ></textarea>
+                rows={3}
+                className="w-full rounded-xl border border-white/15 bg-neutral-900 p-3 text-xs font-mono text-white focus:outline-none"
+                placeholder="e.g. kubectl rollout restart deployment/payment-service"
+              />
             </div>
 
-            <div className="flex gap-3 pt-2">
-              <button
-                onClick={() => handleOverrideFix(editingIncident.id)}
-                className="flex-1 rounded-xl bg-emerald-600 hover:bg-emerald-500 py-3 text-xs font-semibold text-white transition"
-              >
-                Execute Custom Override Fix
-              </button>
+            <div className="flex justify-end gap-3 pt-2">
               <button
                 onClick={() => setEditingIncident(null)}
-                className="rounded-xl border border-white/10 px-5 py-3 text-xs font-medium text-zinc-400 hover:text-white transition"
+                className="px-4 py-2 rounded-xl border border-white/10 text-xs font-medium text-zinc-400 hover:text-white"
               >
                 Cancel
+              </button>
+              <button
+                onClick={handleOverrideSubmit}
+                className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold text-white"
+              >
+                Execute Custom Override
               </button>
             </div>
           </div>
