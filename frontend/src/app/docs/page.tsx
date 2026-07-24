@@ -6,13 +6,35 @@ import * as S from "@/lib/styles";
 
 export default function DocsPage() {
   const [copiedSection, setCopiedSection] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"universal" | "nextjs" | "python" | "nodejs" | "api" | "signoz">("universal");
+  const [activeTab, setActiveTab] = useState<"ai_prompt" | "universal" | "nextjs" | "python" | "nodejs" | "api" | "signoz">("ai_prompt");
 
   const copyToClipboard = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
     setCopiedSection(id);
     setTimeout(() => setCopiedSection(null), 2000);
   };
+
+  const masterAiPrompt = `I want to connect my current application to Observability Copilot (AI-Powered Self-Healing Telemetry Platform). 
+
+Please perform the following integration steps in my codebase automatically:
+
+1. Create a telemetry helper file \`copilot-sdk.ts\` (or \`copilot_sdk.py\` if Python) that sends caught errors and exceptions to the Observability Copilot backend:
+   - Target Endpoint: https://observability-copilot-backend.onrender.com/api/incidents/
+   - HTTP Method: POST
+   - Content-Type: application/json
+   - Payload Schema:
+     {
+       "id": "inc_" + Date.now(),
+       "target": "my-application-name",
+       "status": "detected",
+       "description": "<error_message>",
+       "detected_at": "<ISO_timestamp>",
+       "approval_mode": "manual"
+     }
+
+2. Import this helper into my main layout, middleware, API error handlers, or global error boundaries so any 5xx response or uncaught exception triggers an incident report.
+
+3. Ensure the error capture is wrapped in a try/catch so telemetry delivery failure never breaks application execution.`;
 
   const universalJsScript = `<!-- Add this 5-line snippet inside the <head> of ANY website (HTML, React, Vue, Angular, PHP, WordPress) -->
 <script>
@@ -182,14 +204,22 @@ curl -X POST "https://observability-copilot-backend.onrender.com/api/incidents/i
       <div className="flex flex-1 max-w-7xl mx-auto w-full px-6 py-10 gap-8 relative z-10">
         {/* Navigation Sidebar */}
         <aside className="w-64 hidden lg:block space-y-2 sticky top-10 h-fit">
-          <div className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-3 px-3">Integration Blueprint</div>
+          <div className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-3 px-3">Integration Options</div>
           
+          <button
+            onClick={() => setActiveTab("ai_prompt")}
+            className={`w-full text-left px-4 py-3 rounded-xl text-xs font-medium transition flex items-center justify-between ${activeTab === 'ai_prompt' ? 'bg-white/10 text-white border border-white/20' : 'text-zinc-400 hover:text-white hover:bg-white/5'}`}
+          >
+            <span>AI Assistant Auto-Prompt</span>
+            <span className="text-[10px] text-emerald-400 font-mono">Instant</span>
+          </button>
+
           <button
             onClick={() => setActiveTab("universal")}
             className={`w-full text-left px-4 py-3 rounded-xl text-xs font-medium transition flex items-center justify-between ${activeTab === 'universal' ? 'bg-white/10 text-white border border-white/20' : 'text-zinc-400 hover:text-white hover:bg-white/5'}`}
           >
-            <span>Universal Integration (Any Site)</span>
-            <span className="text-[10px] text-emerald-400 font-mono">Any Site</span>
+            <span>Universal Integration</span>
+            <span className="text-[10px] text-zinc-400 font-mono">Any Site</span>
           </button>
 
           <button
@@ -235,6 +265,42 @@ curl -X POST "https://observability-copilot-backend.onrender.com/api/incidents/i
 
         {/* Content Body */}
         <main className="flex-1 space-y-10 max-w-4xl">
+          {/* AI Prompt Integration Tab */}
+          {activeTab === "ai_prompt" && (
+            <div className="space-y-8">
+              <div>
+                <div className="flex items-center gap-3">
+                  <span className="px-3 py-1 rounded-full text-[10px] font-semibold uppercase tracking-widest text-emerald-400 border border-emerald-500/20 bg-emerald-500/10">
+                    AI Auto-Setup Prompt
+                  </span>
+                  <span className="text-xs text-zinc-500 font-mono">Works with ChatGPT, Claude, Cursor, Antigravity & Copilot</span>
+                </div>
+                <h1 className="text-3xl font-semibold text-white tracking-tight mt-3">1-Click AI Assistant Integration Prompt</h1>
+                <p className="text-sm text-zinc-400 mt-2 leading-relaxed">
+                  Copy the master prompt below and paste it directly into your AI coding assistant (Cursor, Antigravity, ChatGPT, Claude, or GitHub Copilot). Your AI assistant will automatically create all files, instrument error handlers, and connect your application to Observability Copilot.
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 p-6 bg-neutral-900/50 space-y-4" style={S.frame("rgba(24,24,27,0.4)", "rgba(10,10,10,0.7)")}>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <span className="text-[10px] font-mono text-emerald-400 uppercase tracking-widest">Master Prompt</span>
+                    <h3 className="text-base font-semibold text-white mt-0.5">Copy & Paste into your AI Assistant</h3>
+                  </div>
+                  <button
+                    onClick={() => copyToClipboard(masterAiPrompt, "master_prompt")}
+                    className="px-4 py-2 rounded-lg border border-emerald-500/30 bg-emerald-500/20 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/30 transition flex items-center gap-2"
+                  >
+                    <span>{copiedSection === 'master_prompt' ? 'Copied to Clipboard!' : 'Copy Master AI Prompt'}</span>
+                  </button>
+                </div>
+                <pre className="p-4 rounded-xl bg-black/80 border border-white/5 font-mono text-xs text-zinc-300 overflow-x-auto leading-relaxed whitespace-pre-wrap">
+                  <code>{masterAiPrompt}</code>
+                </pre>
+              </div>
+            </div>
+          )}
+
           {/* Universal Integration Blueprint */}
           {activeTab === "universal" && (
             <div className="space-y-8">
@@ -294,15 +360,6 @@ curl -X POST "https://observability-copilot-backend.onrender.com/api/incidents/i
                   <code>{universalBackendPayload}</code>
                 </pre>
               </div>
-
-              {/* Step 3: Monitor & Remediation */}
-              <div className="rounded-2xl border border-white/10 p-6 bg-neutral-900/50 space-y-3" style={S.frame("rgba(24,24,27,0.4)", "rgba(10,10,10,0.7)")}>
-                <span className="text-[10px] font-mono text-emerald-400 uppercase tracking-widest">Step 3: Real-Time SRE Remediation</span>
-                <h3 className="text-base font-semibold text-white">Monitor & Approve Remediation on Dashboard</h3>
-                <p className="text-xs text-zinc-400 leading-relaxed">
-                  Open your live SRE Dashboard (<code className="text-emerald-300 font-mono">/dashboard</code>). Incoming alerts appear in real-time under <strong className="text-white">Awaiting Approval</strong>. Review the LLM Root Cause Analysis, Confidence score, and click <strong className="text-white">Approve & Execute</strong> or <strong className="text-white">Edit / Override Fix</strong> to apply custom remediation.
-                </p>
-              </div>
             </div>
           )}
 
@@ -310,13 +367,7 @@ curl -X POST "https://observability-copilot-backend.onrender.com/api/incidents/i
           {activeTab === "nextjs" && (
             <div className="space-y-8">
               <div>
-                <div className="flex items-center gap-3">
-                  <span className="px-3 py-1 rounded-full text-[10px] font-semibold uppercase tracking-widest text-emerald-400 border border-emerald-500/20 bg-emerald-500/10">
-                    Client Integration
-                  </span>
-                  <span className="text-xs text-zinc-500 font-mono">Next.js 13+ / 14+</span>
-                </div>
-                <h1 className="text-3xl font-semibold text-white tracking-tight mt-3">Next.js Application Integration Guide</h1>
+                <h1 className="text-3xl font-semibold text-white tracking-tight">Next.js Application Integration Guide</h1>
                 <p className="text-sm text-zinc-400 mt-2 leading-relaxed font-sans">
                   Follow this reference to connect Next.js applications to Observability Copilot.
                 </p>
