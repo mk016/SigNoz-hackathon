@@ -222,17 +222,20 @@ export default function DashboardPage() {
           {/* Overview Tab */}
           {(activeTab === "overview" || activeTab === "incidents") && (
             <div className="space-y-8">
-              {/* E-Commerce Microservices Topology */}
+              {/* Connected Websites & Microservices Topology */}
               <div>
                 <div className="flex items-center justify-between mb-4">
                   <div>
-                    <h2 className="text-lg font-semibold text-white">🛒 E-Commerce Microservices Topology</h2>
-                    <p className="text-xs text-zinc-400 mt-0.5">Real-time status of production APIs monitored by SigNoz OpenTelemetry</p>
+                    <h2 className="text-lg font-semibold text-white">Monitored Websites & Microservices Topology</h2>
+                    <p className="text-xs text-zinc-400 mt-0.5">Real-time status of applications, websites & APIs sending telemetry to Observability Copilot</p>
                   </div>
-                  <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">5 Microservices Online</span>
+                  <span className="text-[10px] font-mono text-emerald-400 font-semibold uppercase tracking-widest border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 rounded-full">
+                    {5 + Array.from(new Set(incidents.map(i => i.target).filter(t => !['checkout', 'payment', 'inventory', 'cart', 'auth'].some(s => t.includes(s))))).length} Active Targets
+                  </span>
                 </div>
 
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                  {/* Core Services */}
                   {ecommerceServices.map((svc) => {
                     const info = getServiceStatus(svc.id);
                     return (
@@ -247,6 +250,30 @@ export default function DashboardPage() {
                         </div>
                         <div className={`text-[10px] font-bold uppercase tracking-wider ${info.color === 'emerald' ? 'text-emerald-400' : info.color === 'amber' ? 'text-amber-400' : 'text-rose-400'}`}>
                           {info.status}
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* Dynamically Detected Custom Websites (e.g. BagruSarees.org) */}
+                  {Array.from(new Set(incidents.map(i => i.target).filter(t => !['checkout', 'payment', 'inventory', 'cart', 'auth'].some(s => t.includes(s))))).map((customTarget) => {
+                    const activeIncident = incidents.find(i => i.target === customTarget && i.status !== 'resolved');
+                    const status = !activeIncident ? 'Healthy' : activeIncident.status === 'pending_approval' ? 'Awaiting Approval' : 'Faulty';
+                    const color = !activeIncident ? 'emerald' : activeIncident.status === 'pending_approval' ? 'amber' : 'rose';
+                    return (
+                      <div key={customTarget} className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4 space-y-2 flex flex-col justify-between" style={S.operatorsCard}>
+                        <div className="flex justify-between items-center">
+                          <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-emerald-400 bg-emerald-500/20 px-2 py-0.5 rounded">
+                            Website Target
+                          </span>
+                          <span className={`h-2 w-2 rounded-full ${color === 'emerald' ? 'bg-emerald-400' : color === 'amber' ? 'bg-amber-400 animate-ping' : 'bg-rose-500 animate-pulse'}`}></span>
+                        </div>
+                        <div>
+                          <div className="text-xs font-bold text-white truncate">{customTarget}</div>
+                          <div className="text-[10px] font-mono text-zinc-400 mt-0.5">Connected App</div>
+                        </div>
+                        <div className={`text-[10px] font-bold uppercase tracking-wider ${color === 'emerald' ? 'text-emerald-400' : color === 'amber' ? 'text-amber-400' : 'text-rose-400'}`}>
+                          {status}
                         </div>
                       </div>
                     );
