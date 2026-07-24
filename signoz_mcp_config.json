@@ -1,7 +1,10 @@
 {
   "mcpServers": {
     "signoz": {
-      "url": "https://mcp.us2.signoz.cloud/mcp"
+      "url": "https://mcp.us2.signoz.cloud/mcp",
+      "headers": {
+        "SIGNOZ_API_KEY": "YJId4wSgFnmdzQdu+H+eWmmkO8YosZr+HBGk/xP5UkI="
+      }
     }
   }
 }
