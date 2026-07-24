@@ -10,6 +10,8 @@ from app.routers import incidents, health, chaos
 from dotenv import load_dotenv
 load_dotenv()
 
+from otel.instrumentation import setup_opentelemetry, instrument_app
+
 # Setup OpenTelemetry
 setup_opentelemetry()
 
