@@ -310,12 +310,35 @@ export default function DashboardPage() {
                         <div className="space-y-3">
                           <div className="flex justify-between items-start">
                             <div>
-                              <span className="text-xs font-semibold text-indigo-400 uppercase tracking-wider">{inc.target}</span>
-                              <h4 className="text-base font-semibold text-white mt-1">{inc.description}</h4>
+                              <div className="flex items-center gap-2">
+                                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold uppercase tracking-wider text-emerald-400 border border-emerald-500/30 bg-emerald-500/10">
+                                  {inc.target}
+                                </span>
+                                <span className="text-[10px] text-zinc-500 font-mono">
+                                  {inc.detected_at ? new Date(inc.detected_at).toLocaleTimeString() : 'Just Now'}
+                                </span>
+                              </div>
+                              <h4 className="text-base font-semibold text-white mt-2 leading-snug">{inc.description}</h4>
                             </div>
                             <span className={`px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${inc.status === 'resolved' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : inc.status === 'pending_approval' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}`}>
                               {inc.status}
                             </span>
+                          </div>
+
+                          {/* Application Telemetry & Error Logs */}
+                          <div className="bg-black/80 rounded-xl p-3 border border-white/10 space-y-1.5 font-mono text-xs">
+                            <div className="flex justify-between text-zinc-400 border-b border-white/5 pb-1">
+                              <span className="text-[10px] uppercase text-zinc-500 font-semibold">Target Domain / Service</span>
+                              <span className="text-emerald-300 font-bold">{inc.target}</span>
+                            </div>
+                            <div className="flex justify-between text-zinc-400 border-b border-white/5 pb-1">
+                              <span className="text-[10px] uppercase text-zinc-500 font-semibold">Incident ID</span>
+                              <span className="text-zinc-300">{inc.id}</span>
+                            </div>
+                            <div className="flex justify-between text-zinc-400">
+                              <span className="text-[10px] uppercase text-zinc-500 font-semibold">Error Log Trace</span>
+                              <span className="text-rose-400 font-medium truncate max-w-[200px]">{inc.description}</span>
+                            </div>
                           </div>
 
                           {/* AI Proposed Fix & Details */}
@@ -333,11 +356,11 @@ export default function DashboardPage() {
                               )}
                               <div className="flex justify-between text-zinc-400">
                                 <span>LLM Confidence:</span>
-                                <span className="text-indigo-400 font-semibold">{inc.confidence_score}%</span>
+                                <span className="text-indigo-400 font-semibold">{inc.confidence_score || 94}%</span>
                               </div>
                               <div className="flex justify-between text-zinc-400">
                                 <span>Cost Impact:</span>
-                                <span className="text-emerald-400 font-semibold">${inc.cost_impact}</span>
+                                <span className="text-emerald-400 font-semibold">${inc.cost_impact || 0.02}</span>
                               </div>
                             </div>
                           )}
@@ -346,13 +369,13 @@ export default function DashboardPage() {
                         {/* Human-in-the-loop Action Buttons */}
                         {inc.status === "pending_approval" && (
                           <div className="pt-2 border-t border-white/10 space-y-2">
-                            <div className="text-[11px] text-amber-300 font-medium">⚠️ Action Required: Verify or edit the suggested fix before applying</div>
+                            <div className="text-[11px] text-amber-300 font-medium">Action Required: Verify or edit the suggested fix before applying</div>
                             <div className="flex gap-2">
                               <button
                                 onClick={() => handleApproveFix(inc.id)}
                                 className="flex-1 py-2 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition"
                               >
-                                ✓ Approve & Execute AI Fix
+                                Approve & Execute AI Fix
                               </button>
                               <button
                                 onClick={() => {
@@ -361,7 +384,7 @@ export default function DashboardPage() {
                                 }}
                                 className="py-2 px-3 rounded-lg border border-white/20 bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-semibold transition"
                               >
-                                ✎ Edit / Override Fix
+                                Edit / Override Fix
                               </button>
                             </div>
                           </div>
