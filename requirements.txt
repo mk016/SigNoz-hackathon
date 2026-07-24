@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+openai
+chromadb
+slack_sdk
+opentelemetry-api
+opentelemetry-sdk
+opentelemetry-instrumentation-fastapi
+opentelemetry-exporter-otlp
+requests
+python-dotenv

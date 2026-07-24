@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+frontend/node_modules/
+.pnp
+.pnp.js
+
+# Testing & Cache
+.next/
+frontend/.next/
+__pycache__/
+*.pyc
+.cache/
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# OS files
+.DS_Store
+*.pem
+
+# Python Virtual Environments
+venv/
+.venv/
+env/
