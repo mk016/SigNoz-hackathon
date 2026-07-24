@@ -50,11 +50,11 @@ export default function Header() {
             Assets
           </a>
           <a
-            href="#protocol"
-            className="flex items-center gap-2 border-r border-white/10 px-5 text-xs font-medium uppercase tracking-widest text-zinc-400 transition hover:text-white font-sans"
+            href="/docs"
+            className="flex items-center gap-2 border-r border-white/10 px-5 text-xs font-medium uppercase tracking-widest text-emerald-400 transition hover:text-emerald-300 font-sans"
           >
-            <iconify-icon icon="solar:code-square-linear" className="text-lg"></iconify-icon>
-            Protocol
+            <iconify-icon icon="solar:document-text-linear" className="text-lg"></iconify-icon>
+            Docs
           </a>
         </nav>
 
