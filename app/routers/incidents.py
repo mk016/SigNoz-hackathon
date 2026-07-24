@@ -5,8 +5,30 @@ from datetime import datetime
 
 router = APIRouter()
 
-# In-memory store for incidents for hackathon purposes
-incidents_db = []
+import json
+import os
+
+INCIDENTS_FILE = os.path.join(os.path.dirname(__file__), "..", "incidents_store.json")
+
+def load_incidents_from_file():
+    if os.path.exists(INCIDENTS_FILE):
+        try:
+            with open(INCIDENTS_FILE, "r") as f:
+                data = json.load(f)
+                return [Incident(**item) for item in data]
+        except Exception:
+            return []
+    return []
+
+def save_incidents_to_file():
+    try:
+        data = [json.loads(inc.json()) for inc in incidents_db]
+        with open(INCIDENTS_FILE, "w") as f:
+            json.dump(data, f, indent=2)
+    except Exception:
+        pass
+
+incidents_db = load_incidents_from_file()
 
 class Incident(BaseModel):
     id: str
@@ -41,10 +63,13 @@ def create_incident(incident: Incident):
     for i, existing in enumerate(incidents_db):
         if existing.id == incident.id:
             incidents_db[i] = incident
+            save_incidents_to_file()
             return incident
             
     incidents_db.append(incident)
+    save_incidents_to_file()
     return incident
+
 
 @router.post("/{incident_id}/approve", response_model=Incident)
 def approve_incident_fix(incident_id: str):
@@ -60,6 +85,7 @@ def approve_incident_fix(incident_id: str):
             
             # Execute fix
             execute_remediation(incident.id, incident.dict(), "http://localhost:8000")
+            save_incidents_to_file()
             return incident
     return None
 
@@ -77,6 +103,8 @@ def override_incident_fix(incident_id: str, payload: OverrideFixPayload):
             
             # Execute fix with human overridden resolution
             execute_remediation(incident.id, incident.dict(), "http://localhost:8000")
+            save_incidents_to_file()
             return incident
     return None
+
 
