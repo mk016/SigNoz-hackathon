@@ -1,9 +1,10 @@
 import Header from "@/components/Header";
 import Hero from "@/components/Hero";
 import CopilotDashboard from "@/components/CopilotDashboard";
+import PlatformOverview from "@/components/PlatformOverview";
 import Architecture from "@/components/Architecture";
 import Signals from "@/components/Signals";
-import Assets from "@/components/Assets";
+import FaqSection from "@/components/FaqSection";
 import Protocol from "@/components/Protocol";
 import Deployment from "@/components/Deployment";
 import Footer from "@/components/Footer";
@@ -22,9 +23,10 @@ export default function Home() {
       <main className="relative z-10 mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
         <Hero />
         <CopilotDashboard />
+        <PlatformOverview />
         <Architecture />
         <Signals />
-        <Assets />
+        <FaqSection />
         <Protocol />
         <Deployment />
       </main>
