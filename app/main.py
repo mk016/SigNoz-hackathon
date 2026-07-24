@@ -15,8 +15,45 @@ setup_opentelemetry()
 app = FastAPI(
     title="Observability Copilot API",
     description="AI-powered Self-Healing SRE Agent Backend",
-    version="0.1.0"
+    version="0.1.0",
+    docs_url="/api-docs",
+    redoc_url=None
 )
+
+# Custom Dark Theme Swagger UI Route for Backend API
+from fastapi.responses import HTMLResponse
+
+@app.get("/docs", include_in_schema=False)
+def custom_swagger_ui():
+    html_content = """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Observability Copilot API Docs</title>
+        <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css">
+        <style>
+            body { background-color: #070707 !important; color: #fff !important; font-family: sans-serif; }
+            .swagger-ui { filter: invert(88%) hue-rotate(180deg); }
+            .swagger-ui .topbar { display: none !important; }
+            .swagger-ui .info { margin: 20px 0; }
+        </style>
+    </head>
+    <body>
+        <div id="swagger-ui"></div>
+        <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+        <script>
+            SwaggerUIBundle({
+                url: '/openapi.json',
+                dom_id: '#swagger-ui',
+                deepLinking: true,
+                presets: [SwaggerUIBundle.presets.apis]
+            });
+        </script>
+    </body>
+    </html>
+    """
+    return HTMLResponse(content=html_content)
+
 
 # Instrument the FastAPI app
 instrument_app(app)
