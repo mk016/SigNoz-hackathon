@@ -6,7 +6,7 @@ import * as S from "@/lib/styles";
 
 export default function DocsPage() {
   const [copiedSection, setCopiedSection] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"nextjs" | "python" | "nodejs" | "api" | "signoz">("nextjs");
+  const [activeTab, setActiveTab] = useState<"universal" | "nextjs" | "python" | "nodejs" | "api" | "signoz">("universal");
 
   const copyToClipboard = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
@@ -14,23 +14,49 @@ export default function DocsPage() {
     setTimeout(() => setCopiedSection(null), 2000);
   };
 
+  const universalJsScript = `<!-- Add this 5-line snippet inside the <head> of ANY website (HTML, React, Vue, Angular, PHP, WordPress) -->
+<script>
+  window.addEventListener('error', function(event) {
+    fetch('https://observability-copilot-backend.onrender.com/api/incidents/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: 'inc_' + Date.now(),
+        target: window.location.hostname || 'my-website',
+        status: 'detected',
+        description: event.message + ' (' + event.filename + ':' + event.lineno + ')',
+        detected_at: new Date().toISOString(),
+        approval_mode: 'manual'
+      })
+    });
+  });
+</script>`;
+
+  const universalBackendPayload = `// Universal HTTP POST Payload for ANY Backend (Java, Go, PHP, Ruby, C#, Python, Node)
+POST https://observability-copilot-backend.onrender.com/api/incidents/
+Content-Type: application/json
+
+{
+  "id": "inc_99210",
+  "target": "my-custom-website-service",
+  "status": "detected",
+  "description": "500 Server Error - Database connection pool exhausted",
+  "detected_at": "2026-07-24T12:00:00Z",
+  "approval_mode": "manual"
+}`;
+
   const nextjsSdkCode = `// File: src/lib/copilot-sdk.ts
 export interface CopilotPayload {
   serviceName: string;
   errorMessage: string;
   environment?: string;
-  metadata?: Record<string, any>;
 }
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_COPILOT_BACKEND || "https://observability-copilot-backend.onrender.com";
 
-/**
- * Sends an application error report to Observability Copilot.
- * Automatically triggers LLM Root Cause Analysis and creates an incident ticket.
- */
 export async function trackError(payload: CopilotPayload): Promise<void> {
   try {
-    const response = await fetch(\`\${BACKEND_URL}/api/incidents/\`, {
+    await fetch(\`\${BACKEND_URL}/api/incidents/\`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -42,35 +68,27 @@ export async function trackError(payload: CopilotPayload): Promise<void> {
         approval_mode: "manual"
       })
     });
-
-    if (!response.ok) {
-      console.warn("[Observability Copilot] Incident report rejected with status:", response.status);
-    }
   } catch (error) {
-    console.error("[Observability Copilot] Failed to deliver error payload:", error);
+    console.error("[Observability Copilot] Alert delivery failed:", error);
   }
 }`;
 
-  const nextjsUsageCode = `// File: app/api/checkout/route.ts (or any Server Action / Route)
+  const nextjsUsageCode = `// File: app/api/checkout/route.ts (or any API Route / Server Action)
 import { NextResponse } from "next/server";
 import { trackError } from "@/lib/copilot-sdk";
 
 export async function POST(request: Request) {
   try {
-    // Business logic: Process payment transaction
     const body = await request.json();
     if (!body.paymentToken) {
       throw new Error("Payment gateway connection timeout during authorization step");
     }
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    // Send telemetry alert to Observability Copilot
     await trackError({
       serviceName: "checkout-service",
-      errorMessage: error.message,
-      environment: "production"
+      errorMessage: error.message
     });
-
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }`;
@@ -78,7 +96,7 @@ export async function POST(request: Request) {
   const pythonOtelCode = `# Install OpenTelemetry distribution and OTLP exporter
 pip install opentelemetry-distro opentelemetry-exporter-otlp python-dotenv
 
-# Auto-instrument all installed dependencies
+# Auto-instrument installed dependencies
 opentelemetry-bootstrap --action=install
 
 # Configure environment variables in .env
@@ -145,7 +163,7 @@ curl -X POST "https://observability-copilot-backend.onrender.com/api/incidents/i
           </Link>
           <span className="hidden md:flex items-center gap-2 rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-zinc-300 border border-white/10" style={S.pillBadge}>
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
-            Technical Specification v1.0.0
+            Universal Integration Guide v1.0.0
           </span>
         </div>
 
@@ -164,14 +182,22 @@ curl -X POST "https://observability-copilot-backend.onrender.com/api/incidents/i
       <div className="flex flex-1 max-w-7xl mx-auto w-full px-6 py-10 gap-8 relative z-10">
         {/* Navigation Sidebar */}
         <aside className="w-64 hidden lg:block space-y-2 sticky top-10 h-fit">
-          <div className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-3 px-3">Integration Modules</div>
+          <div className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-3 px-3">Integration Blueprint</div>
           
+          <button
+            onClick={() => setActiveTab("universal")}
+            className={`w-full text-left px-4 py-3 rounded-xl text-xs font-medium transition flex items-center justify-between ${activeTab === 'universal' ? 'bg-white/10 text-white border border-white/20' : 'text-zinc-400 hover:text-white hover:bg-white/5'}`}
+          >
+            <span>Universal Integration (Any Site)</span>
+            <span className="text-[10px] text-emerald-400 font-mono">Any Site</span>
+          </button>
+
           <button
             onClick={() => setActiveTab("nextjs")}
             className={`w-full text-left px-4 py-3 rounded-xl text-xs font-medium transition flex items-center justify-between ${activeTab === 'nextjs' ? 'bg-white/10 text-white border border-white/20' : 'text-zinc-400 hover:text-white hover:bg-white/5'}`}
           >
-            <span>Next.js Application SDK</span>
-            <span className="text-[10px] text-emerald-400 font-mono">SDK</span>
+            <span>Next.js Integration SDK</span>
+            <span className="text-[10px] text-emerald-400 font-mono">Next.js</span>
           </button>
 
           <button
@@ -194,22 +220,93 @@ curl -X POST "https://observability-copilot-backend.onrender.com/api/incidents/i
             onClick={() => setActiveTab("api")}
             className={`w-full text-left px-4 py-3 rounded-xl text-xs font-medium transition flex items-center justify-between ${activeTab === 'api' ? 'bg-white/10 text-white border border-white/20' : 'text-zinc-400 hover:text-white hover:bg-white/5'}`}
           >
-            <span>REST API Reference</span>
-            <span className="text-[10px] text-amber-400 font-mono">HTTP</span>
+            <span>REST API Specification</span>
+            <span className="text-[10px] text-amber-400 font-mono">REST</span>
           </button>
 
           <button
             onClick={() => setActiveTab("signoz")}
             className={`w-full text-left px-4 py-3 rounded-xl text-xs font-medium transition flex items-center justify-between ${activeTab === 'signoz' ? 'bg-white/10 text-white border border-white/20' : 'text-zinc-400 hover:text-white hover:bg-white/5'}`}
           >
-            <span>SigNoz Alertmanager Setup</span>
-            <span className="text-[10px] text-rose-400 font-mono">Cloud</span>
+            <span>SigNoz Alertmanager Webhooks</span>
+            <span className="text-[10px] text-rose-400 font-mono">SigNoz</span>
           </button>
         </aside>
 
         {/* Content Body */}
         <main className="flex-1 space-y-10 max-w-4xl">
-          {/* Section: Next.js SDK */}
+          {/* Universal Integration Blueprint */}
+          {activeTab === "universal" && (
+            <div className="space-y-8">
+              <div>
+                <div className="flex items-center gap-3">
+                  <span className="px-3 py-1 rounded-full text-[10px] font-semibold uppercase tracking-widest text-emerald-400 border border-emerald-500/20 bg-emerald-500/10">
+                    Universal Standard
+                  </span>
+                  <span className="text-xs text-zinc-500 font-mono">Works on 100% of Websites & Backends</span>
+                </div>
+                <h1 className="text-3xl font-semibold text-white tracking-tight mt-3">Universal 3-Step Website Integration Blueprint</h1>
+                <p className="text-sm text-zinc-400 mt-2 leading-relaxed">
+                  Connect ANY website (HTML, React, Vue, Angular, WordPress, PHP, Laravel, Ruby, Java, Go, Python, Node) to Observability Copilot in under 3 minutes.
+                </p>
+              </div>
+
+              {/* Step 1: Frontend Script */}
+              <div className="rounded-2xl border border-white/10 p-6 bg-neutral-900/50 space-y-4" style={S.frame("rgba(24,24,27,0.4)", "rgba(10,10,10,0.7)")}>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <span className="text-[10px] font-mono text-emerald-400 uppercase tracking-widest">Step 1: Frontend Error Capture</span>
+                    <h3 className="text-base font-semibold text-white mt-0.5">Universal HTML / JS Global Listener</h3>
+                  </div>
+                  <button
+                    onClick={() => copyToClipboard(universalJsScript, "universal_js")}
+                    className="px-3 py-1.5 rounded-lg border border-white/10 bg-black/60 hover:bg-white/10 text-xs font-mono text-zinc-300 transition"
+                  >
+                    {copiedSection === 'universal_js' ? 'Copied' : 'Copy Script'}
+                  </button>
+                </div>
+                <p className="text-xs text-zinc-400">
+                  Paste this snippet inside the <code className="text-emerald-300 font-mono">&lt;head&gt;</code> of your website HTML or main layout file.
+                </p>
+                <pre className="p-4 rounded-xl bg-black/80 border border-white/5 font-mono text-xs text-emerald-300 overflow-x-auto leading-relaxed">
+                  <code>{universalJsScript}</code>
+                </pre>
+              </div>
+
+              {/* Step 2: Backend HTTP POST Payload */}
+              <div className="rounded-2xl border border-white/10 p-6 bg-neutral-900/50 space-y-4" style={S.frame("rgba(24,24,27,0.4)", "rgba(10,10,10,0.7)")}>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <span className="text-[10px] font-mono text-emerald-400 uppercase tracking-widest">Step 2: Backend Exception Reporting</span>
+                    <h3 className="text-base font-semibold text-white mt-0.5">Universal HTTP POST Contract</h3>
+                  </div>
+                  <button
+                    onClick={() => copyToClipboard(universalBackendPayload, "universal_backend")}
+                    className="px-3 py-1.5 rounded-lg border border-white/10 bg-black/60 hover:bg-white/10 text-xs font-mono text-zinc-300 transition"
+                  >
+                    {copiedSection === 'universal_backend' ? 'Copied' : 'Copy Payload'}
+                  </button>
+                </div>
+                <p className="text-xs text-zinc-400">
+                  From any backend service (Java, PHP, Go, C#, Python, Ruby, Node), send an HTTP POST request when an API error or exception occurs:
+                </p>
+                <pre className="p-4 rounded-xl bg-black/80 border border-white/5 font-mono text-xs text-amber-300 overflow-x-auto leading-relaxed">
+                  <code>{universalBackendPayload}</code>
+                </pre>
+              </div>
+
+              {/* Step 3: Monitor & Remediation */}
+              <div className="rounded-2xl border border-white/10 p-6 bg-neutral-900/50 space-y-3" style={S.frame("rgba(24,24,27,0.4)", "rgba(10,10,10,0.7)")}>
+                <span className="text-[10px] font-mono text-emerald-400 uppercase tracking-widest">Step 3: Real-Time SRE Remediation</span>
+                <h3 className="text-base font-semibold text-white">Monitor & Approve Remediation on Dashboard</h3>
+                <p className="text-xs text-zinc-400 leading-relaxed">
+                  Open your live SRE Dashboard (<code className="text-emerald-300 font-mono">/dashboard</code>). Incoming alerts appear in real-time under <strong className="text-white">Awaiting Approval</strong>. Review the LLM Root Cause Analysis, Confidence score, and click <strong className="text-white">Approve & Execute</strong> or <strong className="text-white">Edit / Override Fix</strong> to apply custom remediation.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Next.js SDK */}
           {activeTab === "nextjs" && (
             <div className="space-y-8">
               <div>
@@ -221,49 +318,35 @@ curl -X POST "https://observability-copilot-backend.onrender.com/api/incidents/i
                 </div>
                 <h1 className="text-3xl font-semibold text-white tracking-tight mt-3">Next.js Application Integration Guide</h1>
                 <p className="text-sm text-zinc-400 mt-2 leading-relaxed font-sans">
-                  Follow this step-by-step reference to connect any Next.js application to Observability Copilot. This enables automated error capture, LLM Root Cause Analysis, and Human-in-the-Loop remediation workflows.
+                  Follow this reference to connect Next.js applications to Observability Copilot.
                 </p>
               </div>
 
-              {/* Step 1 */}
               <div className="rounded-2xl border border-white/10 p-6 bg-neutral-900/50 space-y-4" style={S.frame("rgba(24,24,27,0.4)", "rgba(10,10,10,0.7)")}>
                 <div className="flex justify-between items-center">
-                  <div>
-                    <span className="text-[10px] font-mono text-emerald-400 uppercase tracking-widest">Step 1 of 2</span>
-                    <h3 className="text-base font-semibold text-white mt-0.5">Create SDK Helper File</h3>
-                  </div>
+                  <h3 className="text-base font-semibold text-white">Create SDK Helper File (<code className="text-emerald-300 font-mono text-xs">src/lib/copilot-sdk.ts</code>)</h3>
                   <button
                     onClick={() => copyToClipboard(nextjsSdkCode, "nextjs_sdk")}
                     className="px-3 py-1.5 rounded-lg border border-white/10 bg-black/60 hover:bg-white/10 text-xs font-mono text-zinc-300 transition"
                   >
-                    {copiedSection === 'nextjs_sdk' ? 'Copied' : 'Copy SDK Code'}
+                    {copiedSection === 'nextjs_sdk' ? 'Copied' : 'Copy Code'}
                   </button>
                 </div>
-                <p className="text-xs text-zinc-400">
-                  Save the following file in your Next.js project as <code className="text-emerald-300 font-mono">src/lib/copilot-sdk.ts</code>.
-                </p>
                 <pre className="p-4 rounded-xl bg-black/80 border border-white/5 font-mono text-xs text-zinc-300 overflow-x-auto leading-relaxed">
                   <code>{nextjsSdkCode}</code>
                 </pre>
               </div>
 
-              {/* Step 2 */}
               <div className="rounded-2xl border border-white/10 p-6 bg-neutral-900/50 space-y-4" style={S.frame("rgba(24,24,27,0.4)", "rgba(10,10,10,0.7)")}>
                 <div className="flex justify-between items-center">
-                  <div>
-                    <span className="text-[10px] font-mono text-emerald-400 uppercase tracking-widest">Step 2 of 2</span>
-                    <h3 className="text-base font-semibold text-white mt-0.5">Invoke Error Reporter</h3>
-                  </div>
+                  <h3 className="text-base font-semibold text-white">Invoke Error Reporter in Routes</h3>
                   <button
                     onClick={() => copyToClipboard(nextjsUsageCode, "nextjs_usage")}
                     className="px-3 py-1.5 rounded-lg border border-white/10 bg-black/60 hover:bg-white/10 text-xs font-mono text-zinc-300 transition"
                   >
-                    {copiedSection === 'nextjs_usage' ? 'Copied' : 'Copy Example'}
+                    {copiedSection === 'nextjs_usage' ? 'Copied' : 'Copy Code'}
                   </button>
                 </div>
-                <p className="text-xs text-zinc-400">
-                  Import <code className="text-emerald-300 font-mono">trackError</code> inside your API routes, Server Actions, or catch blocks.
-                </p>
                 <pre className="p-4 rounded-xl bg-black/80 border border-white/5 font-mono text-xs text-zinc-300 overflow-x-auto leading-relaxed">
                   <code>{nextjsUsageCode}</code>
                 </pre>
@@ -271,19 +354,13 @@ curl -X POST "https://observability-copilot-backend.onrender.com/api/incidents/i
             </div>
           )}
 
-          {/* Section: Python */}
+          {/* Python */}
           {activeTab === "python" && (
             <div className="space-y-8">
               <div>
-                <div className="flex items-center gap-3">
-                  <span className="px-3 py-1 rounded-full text-[10px] font-semibold uppercase tracking-widest text-indigo-400 border border-indigo-500/20 bg-indigo-500/10">
-                    OpenTelemetry Protocol
-                  </span>
-                  <span className="text-xs text-zinc-500 font-mono">Python 3.9+</span>
-                </div>
-                <h1 className="text-3xl font-semibold text-white tracking-tight mt-3">Python & FastAPI Instrumentation</h1>
-                <p className="text-sm text-zinc-400 mt-2 leading-relaxed">
-                  Configure OpenTelemetry Python SDK to export traces to SigNoz Cloud via OTLP gRPC/HTTP endpoints.
+                <h1 className="text-3xl font-semibold text-white tracking-tight">Python & OpenTelemetry Setup</h1>
+                <p className="text-sm text-zinc-400 mt-2">
+                  Instrument Python apps with OpenTelemetry SDK and export live OTLP traces to SigNoz Cloud.
                 </p>
               </div>
 
@@ -304,18 +381,12 @@ curl -X POST "https://observability-copilot-backend.onrender.com/api/incidents/i
             </div>
           )}
 
-          {/* Section: Node.js */}
+          {/* Node.js */}
           {activeTab === "nodejs" && (
             <div className="space-y-8">
               <div>
-                <div className="flex items-center gap-3">
-                  <span className="px-3 py-1 rounded-full text-[10px] font-semibold uppercase tracking-widest text-zinc-300 border border-white/10 bg-white/5">
-                    Node.js Runtime
-                  </span>
-                  <span className="text-xs text-zinc-500 font-mono">Express / NestJS</span>
-                </div>
-                <h1 className="text-3xl font-semibold text-white tracking-tight mt-3">Node.js Tracing Setup</h1>
-                <p className="text-sm text-zinc-400 mt-2 leading-relaxed">
+                <h1 className="text-3xl font-semibold text-white tracking-tight">Node.js Tracing Setup</h1>
+                <p className="text-sm text-zinc-400 mt-2">
                   Export HTTP server requests, database queries, and error traces to SigNoz Cloud OTLP collector.
                 </p>
               </div>
@@ -337,18 +408,12 @@ curl -X POST "https://observability-copilot-backend.onrender.com/api/incidents/i
             </div>
           )}
 
-          {/* Section: API Reference */}
+          {/* API Reference */}
           {activeTab === "api" && (
             <div className="space-y-8">
               <div>
-                <div className="flex items-center gap-3">
-                  <span className="px-3 py-1 rounded-full text-[10px] font-semibold uppercase tracking-widest text-amber-400 border border-amber-500/20 bg-amber-500/10">
-                    REST API Specification
-                  </span>
-                  <span className="text-xs text-zinc-500 font-mono">OpenAPI 3.1</span>
-                </div>
-                <h1 className="text-3xl font-semibold text-white tracking-tight mt-3">Backend REST API Reference</h1>
-                <p className="text-sm text-zinc-400 mt-2 leading-relaxed">
+                <h1 className="text-3xl font-semibold text-white tracking-tight">Backend REST API Specification</h1>
+                <p className="text-sm text-zinc-400 mt-2">
                   Direct HTTP endpoint contracts for incident ingestion, human approval, and custom fix overrides.
                 </p>
               </div>
@@ -370,18 +435,12 @@ curl -X POST "https://observability-copilot-backend.onrender.com/api/incidents/i
             </div>
           )}
 
-          {/* Section: SigNoz */}
+          {/* SigNoz */}
           {activeTab === "signoz" && (
             <div className="space-y-8">
               <div>
-                <div className="flex items-center gap-3">
-                  <span className="px-3 py-1 rounded-full text-[10px] font-semibold uppercase tracking-widest text-rose-400 border border-rose-500/20 bg-rose-500/10">
-                    Alerting Pipeline
-                  </span>
-                  <span className="text-xs text-zinc-500 font-mono">SigNoz Cloud</span>
-                </div>
-                <h1 className="text-3xl font-semibold text-white tracking-tight mt-3">SigNoz Cloud Alertmanager Webhook Integration</h1>
-                <p className="text-sm text-zinc-400 mt-2 leading-relaxed">
+                <h1 className="text-3xl font-semibold text-white tracking-tight">SigNoz Cloud Alertmanager Webhooks</h1>
+                <p className="text-sm text-zinc-400 mt-2">
                   Connect SigNoz Cloud anomaly alerts to automatically trigger LLM Root Cause Analysis and SRE tickets.
                 </p>
               </div>
@@ -397,7 +456,6 @@ curl -X POST "https://observability-copilot-backend.onrender.com/api/incidents/i
                       https://observability-copilot-backend.onrender.com/api/incidents/
                     </div>
                   </li>
-                  <li>Save rule. Alerts will now stream live to your SRE Copilot Dashboard.</li>
                 </ol>
               </div>
             </div>
