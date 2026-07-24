@@ -14,7 +14,7 @@ AGENT_PID=$!
 
 # 3. Start Next.js Frontend
 echo "3. Launching Next.js Frontend on http://localhost:3000..."
-cd frontend && npm run dev
+cd frontend && rm -rf .next && npm run dev
 
 # Cleanup on exit
 trap "kill $BACKEND_PID $AGENT_PID" EXIT
